@@ -13,6 +13,9 @@ services:
       options:
         max-size: "16m"
         tag: "{{.ImageName}}"
+        max-file: "4"
+    mem_limit: 256m
+
     networks:
       - logging
 
@@ -41,6 +44,8 @@ services:
       options:
         max-size: "16m"
         tag: "{{.ImageName}}"
+        max-file: "4"
+    mem_limit: 256m
 
   promtail:
     image: grafana/promtail:2.5.0
@@ -62,6 +67,8 @@ services:
       options:
         max-size: "16m"
         tag: "{{.ImageName}}"
+        max-file: "4"
+    mem_limit: 256m
 
   loki:
     container_name: loki
@@ -76,8 +83,26 @@ services:
     logging:
       driver: "json-file"
       options:
+        max-size: "50m"
+        tag: "{{.ImageName}}"
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - logging
+    logging:
+      driver: "json-file"
+      options:
         max-size: "16m"
         tag: "{{.ImageName}}"
+        max-file: "4"
+    mem_limit: 256m
 
 networks:
   logging:
