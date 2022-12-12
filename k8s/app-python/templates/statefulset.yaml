@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "app-python.fullname" . }}
   labels: 
@@ -8,6 +8,10 @@ spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
+
+  serviceName: {{ include "app-python.fullname" . }}-service
+  podManagementPolicy: {{ .Values.podManagementPolicy }}
+
   selector:
     matchLabels:
       {{- include "app-python.selectorLabels" . | nindent 6 }}
@@ -27,6 +31,11 @@ spec:
       serviceAccountName: {{ include "app-python.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes:
+         - name: config-volume
+           configMap:
+             name: app-python-config
+      
       containers:
         - name: {{ .Chart.Name }}
           securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
@@ -56,6 +65,9 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: /files
+            - name: {{ .Values.statefulSet.name }}
+              mountPath: /app-python/
+
       volumes:
         - name: config-volume
           configMap:
@@ -73,3 +85,11 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  volumeClaimTemplates:
+   - metadata:
+       name: {{ .Values.statefulSet.name }}
+     spec:
+       accessModes: [ "ReadWriteOnce" ]
+       resources:
+         requests:
+           storage: {{ .Values.statefulSet.storageSize }}

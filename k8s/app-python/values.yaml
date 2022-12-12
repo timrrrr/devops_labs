@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: dmitriipolushin/lab2_python_app
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"
 
@@ -80,3 +80,8 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+podManagementPolicy: "Parallel"
+
+statefulSet:
+    name: visits
