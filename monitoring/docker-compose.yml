@@ -1,35 +1,60 @@
----
-version: "3"
+version: '3.7'
 
 services:
-
   app_python:
     image: python_app_msk_time:latest
-    container_name: msk_time_app
     ports:
-      - "80:8080"
+       - "8000:8000"
+    networks:
+      - monitoring
     logging:
       driver: "json-file"
       options:
-        max-size: "16m"
+        max-size: "100m"
         tag: "{{.ImageName}}"
-        max-file: "4"
-    mem_limit: 256m
-
+    mem_limit: 100m
+    volumes:
+      - app_python-logs:/code/logs
+  prometheus:
+    image: prom/prometheus:v2.18.1
+    container_name: monitoring.prometheus
+    volumes:
+      - ${PWD}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=14d'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.wal-compression'
+      - '--storage.tsdb.max-block-duration=4h'
+      - '--storage.tsdb.wal-segment-size=60MB'
+      - '--storage.tsdb.allow-overlapping-blocks'
+      - '--query.max-samples=5000000'
+    restart: unless-stopped
+    expose:
+      - 9090
+    ports:
+      - "9090:9090"
     networks:
-      - logging
+      - monitoring
+    labels:
+      org.label-schema.group: "monitoring"
+    logging:
+        driver: "json-file"
+        options:
+          max-size: "100m"
+    mem_limit: 100m
 
   grafana:
-    image: grafana/grafana:7.3.4
-    container_name: grafana
+    image: grafana/grafana:latest
+    container_name: monitoring.grafana
     volumes:
       - grafana-data:/var/lib/grafana
       - ${PWD}/grafana/provisioning:/etc/grafana/provisioning
     environment:
-      - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - VIRTUAL_HOST=grafana
       - NETWORK_ACCESS=internal
       - VIRTUAL_PORT=3000
     restart: unless-stopped
@@ -38,76 +63,65 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - logging
+      - monitoring
+    labels:
+      org.label-schema.group: "monitoring"
     logging:
       driver: "json-file"
       options:
-        max-size: "16m"
-        tag: "{{.ImageName}}"
-        max-file: "4"
-    mem_limit: 256m
+        max-size: "100m"
+    mem_limit: 100m
 
   promtail:
-    image: grafana/promtail:2.5.0
-    container_name: promtail
+    image: grafana/promtail:latest
+    container_name: monitoring.promtail
     expose:
       - 9080
     ports:
       - "9080:9080"
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail-data:/var/lib/promtail/positions
       - ${PWD}/promtail/promtail.yml:/etc/promtail/promtail.yml
     command:
       - '-config.file=/etc/promtail/promtail.yml'
     restart: unless-stopped
     networks:
-      - logging
+      - monitoring
+    labels:
+      org.label-schema.group: "monitoring"
     logging:
       driver: "json-file"
       options:
-        max-size: "16m"
-        tag: "{{.ImageName}}"
-        max-file: "4"
-    mem_limit: 256m
+        max-size: "100m"
+    mem_limit: 100m
 
   loki:
-    container_name: loki
-    image: grafana/loki:2.5.0
+    container_name: monitoring.loki
+    image: grafana/loki:latest
     expose:
       - 3100
     ports:
       - "3100:3100"
     restart: unless-stopped
     networks:
-      - logging
+      - monitoring
+    labels:
+      org.label-schema.group: "monitoring"
     logging:
       driver: "json-file"
       options:
-        max-size: "50m"
-        tag: "{{.ImageName}}"
-
-  prometheus:
-    image: prom/prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-    networks:
-      - logging
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "16m"
-        tag: "{{.ImageName}}"
-        max-file: "4"
-    mem_limit: 256m
+        max-size: "100m"
+    mem_limit: 100m
 
 networks:
-  logging:
+  monitoring:
+    ipam:
+      driver: default
 
 volumes:
   grafana-data: {}
-  promtail-data: {}
   loki-data: {}
+  promtail-data: {}
+  prometheus-data: {}
+  app_python-logs: {}
